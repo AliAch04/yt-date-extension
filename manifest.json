@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Exact Date on Hover",
+  "version": "1.0",
+  "description": "Shows the exact upload date when hovering a video.",
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
