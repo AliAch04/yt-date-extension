@@ -1,11 +1,12 @@
 const cache = {};
 let tip = null;
+let currentLink = null;
 
 function makeTip() {
   tip = document.createElement("div");
   Object.assign(tip.style, {
     position: "fixed",
-    zIndex: 999999,
+    zIndex: 2147483647,
     background: "#111",
     color: "#fff",
     padding: "6px 10px",
@@ -20,40 +21,49 @@ function makeTip() {
 
 async function getDate(url) {
   if (cache[url]) return cache[url];
-  const res = await fetch(url, { credentials: "omit" });
-  const html = await res.text();
-  const m = html.match(/"uploadDate":"([^"]+)"/) ||
-            html.match(/itemprop="datePublished" content="([^"]+)"/);
-  if (!m) return "Date not found";
-  const d = new Date(m[1]);
-  cache[url] = d.toLocaleString(undefined, {
-    year: "numeric", month: "long", day: "numeric",
-    hour: "2-digit", minute: "2-digit"
-  });
-  return cache[url];
+  try {
+    const res = await fetch(url, { credentials: "omit" });
+    const html = await res.text();
+    const m = html.match(/"uploadDate":"([^"]+)"/) ||
+              html.match(/"publishDate":"([^"]+)"/) ||
+              html.match(/itemprop="datePublished" content="([^"]+)"/);
+    if (!m) return "Date not found";
+    const d = new Date(m[1]);
+    cache[url] = d.toLocaleString(undefined, {
+      year: "numeric", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit"
+    });
+    return cache[url];
+  } catch (err) {
+    return "Error loading date";
+  }
 }
 
-let current = null;
+function showTip(link, text) {
+  const rect = link.getBoundingClientRect();
+  tip.style.left = Math.max(rect.left, 4) + "px";
+  tip.style.top = Math.max(rect.top + 6, 4) + "px";
+  tip.textContent = text;
+  tip.style.display = "block";
+}
 
 document.addEventListener("mouseover", async (e) => {
-  const link = e.target.closest("a#thumbnail, a#video-title-link, a.yt-lockup-view-model-wiz__content-image");
-  if (!link || !link.href.includes("/watch")) return;
   if (!tip) makeTip();
 
-  current = link.href;
-  const rect = link.getBoundingClientRect();
-  tip.style.left = rect.left + "px";
-  tip.style.top = Math.max(rect.top - 34, 4) + "px";
-  tip.textContent = "Loading...";
-  tip.style.display = "block";
+  const link = e.target.closest('a[href*="/watch"]');
+  const inPreview = e.target.closest("ytd-video-preview");
 
-  const date = await getDate(link.href);
-  if (current === link.href) tip.textContent = date;
-});
-
-document.addEventListener("mouseout", (e) => {
-  if (e.target.closest("a#thumbnail, a#video-title-link, a.yt-lockup-view-model-wiz__content-image") && tip) {
+  if (link) {
+    if (link === currentLink) return;
+    currentLink = link;
+    showTip(link, "Loading...");
+    const date = await getDate(link.href);
+    if (currentLink === link) showTip(link, date);
+  } else if (inPreview && currentLink) {
+    // mouse is on the preview player: keep tooltip as is
+    return;
+  } else {
+    currentLink = null;
     tip.style.display = "none";
-    current = null;
   }
 });
